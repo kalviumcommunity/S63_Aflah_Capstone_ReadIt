@@ -2,6 +2,9 @@ const express = require("express");
 
 const app = express();
 
+app.use('/api/users', require('../Backend/routes/userRoutes'));
+
+
 const PORT =8000;
 
 app.get('/', (req, res) => {
