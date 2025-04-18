@@ -1,13 +1,11 @@
+// models/User.js
 const mongoose = require('mongoose');
-const uniqueValidator = require('mongoose-unique-validator');
 
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
     unique: true,
-    trim: true,
-    minlength: 3
   },
   email: {
     type: String,
@@ -24,12 +22,14 @@ const userSchema = new mongoose.Schema({
     url: String,
     public_id: String
   },
+  posts: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Post',  // Reference to Post model
+  }],
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
-
-userSchema.plugin(uniqueValidator);
 
 module.exports = mongoose.model('User', userSchema);
