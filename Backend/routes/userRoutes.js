@@ -1,69 +1,100 @@
-// routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('../model/user');
-const Post = require('../model/post');
 
-// Create a new User
-router.post('/', async (req, res) => {
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// === REGISTER ===
+router.post('/register', async (req, res) => {
+  const { username, email, password } = req.body;
+
   try {
-    const { username, email, password, avatar } = req.body;
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
 
-    const newUser = new User({
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = await User.create({
       username,
       email,
-      password,
-      avatar,
+      password: hashedPassword
+      // avatar and posts will take default values
     });
 
-    const savedUser = await newUser.save();
-    res.status(201).json(savedUser);
+    // Check for secret
+    if (!JWT_SECRET) {
+      console.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
+    // Sign JWT
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '3d' });
+
+    res.status(201).json({
+      token,
+      user: {
+        username: user.username,
+        email: user.email
+      }
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Registration error:', err.message);
+    console.error(err.stack);
+    res.status(500).json({
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
-// Get all users (excluding passwords)
-router.get('/', async (req, res) => {
-  try {
-    const users = await User.find().select('-password');
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// === LOGIN ===
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
 
-// Get single user by ID with populated posts
-router.get('/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate('posts').select('-password');
+    console.log('Login attempt for email:', email);
+
+    if (!JWT_SECRET) {
+      console.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ message: 'Server configuration error' });
+    }
+
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Update user by ID
-router.put('/:id', async (req, res) => {
-  try {
-    const { username, email, avatar } = req.body;
-
-    const updatedUser = await User.findByIdAndUpdate(
-      req.params.id,
-      { username, email, avatar },
-      { new: true }
-    ).select('-password');
-
-    if (!updatedUser) {
-      return res.status(404).json({ error: 'User not found' });
+      console.log('User not found:', email);
+      return res.status(400).json({ message: 'User not found' });
     }
 
-    res.json(updatedUser);
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('Invalid password for user:', email);
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '3d' });
+
+    console.log('Login successful for user:', email);
+    res.status(200).json({
+      token,
+      user: {
+        username: user.username,
+        email: user.email
+      }
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error('Login error:', err.message);
+    console.error(err.stack);
+    res.status(500).json({
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 

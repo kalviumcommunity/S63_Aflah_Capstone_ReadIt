@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -19,12 +18,13 @@ const userSchema = new mongoose.Schema({
     minlength: 6
   },
   avatar: {
-    url: String,
-    public_id: String
+    url: { type: String, default: '' },
+    public_id: { type: String, default: '' }
   },
   posts: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Post',  // Reference to Post model
+    ref: 'Post',
+    default: []
   }],
   createdAt: {
     type: Date,
